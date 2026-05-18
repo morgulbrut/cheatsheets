@@ -1,0 +1,63 @@
+name: Build and publish Typst PDFs to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**/*.typ"
+      - ".github/workflows/typst-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Typst
+        uses: typst-community/setup-typst@v4
+
+      - name: Build PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist site
+
+          found=0
+          while IFS= read -r -d '' file; do
+            found=1
+            sheet_dir="$(dirname "$file")"
+            sheet_name="$(basename "$sheet_dir")"
+            typst compile "$file" "dist/${sheet_name}.pdf"
+          done < <(find src -mindepth 2 -maxdepth 2 -name main.typ -print0)
+
+          if [ "$found" -eq 0 ]; then
+            echo "No src/<sheet>/main.typ files found"
+            exit 1
+          fi
+
+          cp dist/*.pdf site/
+
+          {
+            echo "<!doctype html>"
+            echo "<html><head><meta charset=\"utf-8\"><title>Cheatsheets</title></head><body>"
+            echo "<h1>Cheatsheets</h1><ul>"
+            for pdf in site/*.pdf; do
+              name="$(basename "$pdf")"
+              echo "<li><a href=\"$name\">$name</a></li>"
+            done

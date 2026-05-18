@@ -1,0 +1,53 @@
+name: Build Typst PDFs and commit dist
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**/*.typ"
+      - ".github/workflows/typst-commit-dist.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Typst
+        uses: typst-community/setup-typst@v4
+
+      - name: Build PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          found=0
+          while IFS= read -r -d '' file; do
+            found=1
+            sheet_dir="$(dirname "$file")"
+            sheet_name="$(basename "$sheet_dir")"
+            typst compile "$file" "dist/${sheet_name}.pdf"
+          done < <(find src -mindepth 2 -maxdepth 2 -name main.typ -print0)
+
+          if [ "$found" -eq 0 ]; then
+            echo "No src/<sheet>/main.typ files found"
+            exit 1
+          fi
+
+      - name: Commit updated PDFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
