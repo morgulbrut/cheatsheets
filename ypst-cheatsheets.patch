@@ -1,0 +1,263 @@
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,4 @@
++dist/*
++!dist/.gitkeep
++!dist/*.pdf
++site/
+diff --git a/.github/workflows/typst-commit-dist.yml b/.github/workflows/typst-commit-dist.yml
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/.github/workflows/typst-commit-dist.yml
+@@ -0,0 +1,53 @@
++name: Build Typst PDFs and commit dist
++
++on:
++  push:
++    branches:
++      - main
++    paths:
++      - "src/**/*.typ"
++      - ".github/workflows/typst-commit-dist.yml"
++  workflow_dispatch:
++
++permissions:
++  contents: write
++
++jobs:
++  build-and-commit:
++    runs-on: ubuntu-latest
++
++    steps:
++      - name: Check out repository
++        uses: actions/checkout@v4
++        with:
++          fetch-depth: 0
++
++      - name: Install Typst
++        uses: typst-community/setup-typst@v4
++
++      - name: Build PDFs
++        shell: bash
++        run: |
++          set -euo pipefail
++          mkdir -p dist
++
++          found=0
++          while IFS= read -r -d '' file; do
++            found=1
++            sheet_dir="$(dirname "$file")"
++            sheet_name="$(basename "$sheet_dir")"
++            typst compile "$file" "dist/${sheet_name}.pdf"
++          done < <(find src -mindepth 2 -maxdepth 2 -name main.typ -print0)
++
++          if [ "$found" -eq 0 ]; then
++            echo "No src/<sheet>/main.typ files found"
++            exit 1
++          fi
++
++      - name: Commit updated PDFs
++        shell: bash
++        run: |
++          set -euo pipefail
++          git config user.name "github-actions[bot]"
++          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
++
++          git add dist/*.pdf
++
++          if git diff --cached --quiet; then
++            echo "No PDF changes to commit"
++            exit 0
++          fi
++
++          git commit -m "Build Typst PDFs"
++          git push
+diff --git a/.github/workflows/typst-pages.yml b/.github/workflows/typst-pages.yml
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/.github/workflows/typst-pages.yml
+@@ -0,0 +1,63 @@
++name: Build and publish Typst PDFs to GitHub Pages
++
++on:
++  push:
++    branches:
++      - main
++    paths:
++      - "src/**/*.typ"
++      - ".github/workflows/typst-pages.yml"
++  workflow_dispatch:
++
++permissions:
++  contents: read
++  pages: write
++  id-token: write
++
++concurrency:
++  group: pages
++  cancel-in-progress: true
++
++jobs:
++  build:
++    runs-on: ubuntu-latest
++    environment:
++      name: github-pages
++      url: ${{ steps.deployment.outputs.page_url }}
++
++    steps:
++      - name: Check out repository
++        uses: actions/checkout@v4
++
++      - name: Install Typst
++        uses: typst-community/setup-typst@v4
++
++      - name: Build PDFs
++        shell: bash
++        run: |
++          set -euo pipefail
++          mkdir -p dist site
++
++          found=0
++          while IFS= read -r -d '' file; do
++            found=1
++            sheet_dir="$(dirname "$file")"
++            sheet_name="$(basename "$sheet_dir")"
++            typst compile "$file" "dist/${sheet_name}.pdf"
++          done < <(find src -mindepth 2 -maxdepth 2 -name main.typ -print0)
++
++          if [ "$found" -eq 0 ]; then
++            echo "No src/<sheet>/main.typ files found"
++            exit 1
++          fi
++
++          cp dist/*.pdf site/
++
++          {
++            echo "<!doctype html>"
++            echo "<html><head><meta charset=\"utf-8\"><title>Cheatsheets</title></head><body>"
++            echo "<h1>Cheatsheets</h1><ul>"
++            for pdf in site/*.pdf; do
++              name="$(basename "$pdf")"
++              echo "<li><a href=\"$name\">$name</a></li>"
++            done
++            echo "</ul></body></html>"
++          } > site/index.html
++
++      - name: Configure Pages
++        uses: actions/configure-pages@v5
++
++      - name: Upload Pages artifact
++        uses: actions/upload-pages-artifact@v3
++        with:
++          path: site
++
++      - name: Deploy to GitHub Pages
++        id: deployment
++        uses: actions/deploy-pages@v4
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,29 @@
++# cheatsheets
++
++A repository for Typst-based cheatsheets.
++
++## Layout
++
++- `src/<sheet>/main.typ` — one cheatsheet per folder
++- `src/shared/` — shared Typst helpers, theme, and macros
++- `dist/` — generated PDFs
++- `.github/workflows/` — CI workflows
++
++## Build convention
++
++Each cheatsheet lives in its own directory and is built from:
++
++- `src/algebra/main.typ`
++- `src/calculus/main.typ`
++
++This produces:
++
++- `dist/algebra.pdf`
++- `dist/calculus.pdf`
++
++## Workflows
++
++This repository supports both:
++
++1. **GitHub Pages publishing**
++2. **Commit generated PDFs into `dist/`**
++
++To publish Pages, configure **Settings → Pages** to use **GitHub Actions**.
+diff --git a/dist/.gitkeep b/dist/.gitkeep
+new file mode 100644
+index 0000000..e69de29
+diff --git a/src/algebra/main.typ b/src/algebra/main.typ
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/algebra/main.typ
+@@ -0,0 +1,8 @@
++#import "../shared/theme.typ": *
++
++#show: cheatsheet-title.with("Algebra Cheatsheet")
++
++#section("Identities")
++$ (a + b)^2 = a^2 + 2ab + b^2 $
++$ (a - b)^2 = a^2 - 2ab + b^2 $
++
++#section("Quadratic Formula")
++$ x = (-b plus.minus sqrt(b^2 - 4ac)) / (2a) $
+diff --git a/src/calculus/main.typ b/src/calculus/main.typ
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/calculus/main.typ
+@@ -0,0 +1,8 @@
++#import "../shared/theme.typ": *
++
++#show: cheatsheet-title.with("Calculus Cheatsheet")
++
++#section("Derivatives")
++$ d/dx x^n = n x^(n - 1) $
++$ d/dx sin x = cos x $
++
++#section("Integrals")
++$ integral x^n dif x = x^(n+1)/(n+1) + C $
++$ integral 1/x dif x = ln abs(x) + C $
+diff --git a/src/shared/theme.typ b/src/shared/theme.typ
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/shared/theme.typ
+@@ -0,0 +1,18 @@
++#set page(
++  paper: "a4",
++  margin: 1cm,
++)
++
++#set text(
++  font: "Libertinus Serif",
++  size: 10pt,
++)
++
++#let cheatsheet-title(title) = [
++  #align(center)[
++    #text(16pt, weight: "bold")[#title]
++  ]
++  #v(0.5em)
++]
++
++#let section(title) = [
++  #v(0.75em)
++  #text(12pt, weight: "bold")[#title]
++  #line(length: 100%)
++  #v(0.25em)
++]
