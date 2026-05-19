@@ -7,6 +7,12 @@
   ),
 )
 
+= Albania
+#container[
+  == General
+  - Red left or blue right and left strip on the number plate
+]
+
 = Argentina
 #container[
   == General
@@ -54,8 +60,7 @@
 = Japan
 #container[
   == Hokkaido
-  - Red/wite overhead arrows
-  
+  - Red/wite overhead arrow
 ]
 
 = Mexico
